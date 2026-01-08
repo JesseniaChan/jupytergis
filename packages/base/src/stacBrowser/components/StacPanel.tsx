@@ -15,51 +15,66 @@ import StacPanelFilters from './StacPanelFilters';
 import StacPanelResults from './StacPanelResults';
 import CollectionBrowser from './CollectionBrowser';
 import useGenericStacSearch from '@/src/stacBrowser/hooks/useGenericStacSearch';
+
 interface IStacViewProps {
   model?: IJupyterGISModel;
 }
+
 const StacPanel = ({ model }: IStacViewProps) => {
   const inputRef = React.useRef<HTMLInputElement | null>(null);
+
   const [selectedCatalog, setSelectedCatalog] = React.useState<string>('');
   const [genericCollectionData, setGenericCollectionData] =
     React.useState<any>(null);
   const [activeTab, setActiveTab] = React.useState('filters');
+
   const { catalogs } = useStacIndex(model);
-  // 1. Legacy Search (GEODES)
+
   const geodesSearch = useStacSearch({ model });
-  // 2. Generic Search
+
   const genericSearch = useGenericStacSearch({
     model,
     collectionUrl: genericCollectionData?.url,
     collectionData: genericCollectionData,
   });
+
   const isGenericMode = !!selectedCatalog;
-  // Auto-switch to Results when a collection is selected
-  React.useEffect(() => {
-    if (genericCollectionData) {
-      setActiveTab('results');
-    }
-  }, [genericCollectionData]);
+
+  const activeCatalog = catalogs.find(c => c.url === selectedCatalog);
+  const catalogTitle = activeCatalog?.title || 'Custom Catalog';
+
+  // REMOVED: The useEffect that auto-switched to 'results' tab
+  // React.useEffect(() => {
+  //   if (genericCollectionData) {
+  //     setActiveTab('results');
+  //   }
+  // }, [genericCollectionData]);
+
   const handleOpenDialog = async () => {
     const widget = new URLInputWidget(catalogs);
     inputRef.current = widget.getInput();
+
     const dialog = new Dialog<boolean>({
       title: 'Select STAC Catalog',
       body: widget,
       buttons: [Dialog.cancelButton(), Dialog.okButton({ label: 'Select' })],
     });
+
     const result = await dialog.launch();
+
     if (result.button.accept && inputRef.current?.value) {
       setSelectedCatalog(inputRef.current.value);
       setGenericCollectionData(null);
       setActiveTab('filters');
     }
   };
+
   const handleResetCatalog = () => {
     setSelectedCatalog('');
     setGenericCollectionData(null);
     setActiveTab('filters');
   };
+
   const activeResults = isGenericMode
     ? genericSearch.results
     : geodesSearch.results;
@@ -84,21 +99,19 @@ const StacPanel = ({ model }: IStacViewProps) => {
   const activeTotalPages = isGenericMode
     ? genericSearch.totalPages
     : geodesSearch.totalPages;
+
   if (!model) return null;
+
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
       {/* Catalog Header */}
       <div className="flex-none px-3 py-2 border-b border-gray-200 bg-gray-50">
         <div className="text-xs font-semibold text-gray-700 mb-1">
-          {isGenericMode
-            ? genericCollectionData?.title || 'Custom Catalog'
-            : 'Earth Search'}
+          {isGenericMode ? catalogTitle : 'Earth Search'}
         </div>
         <div className="flex items-center gap-2">
           <div className="flex-1 text-xs text-gray-500 truncate">
-            {isGenericMode
-              ? `Browsing: ${selectedCatalog}`
-              : 'Public datasets on AWS'}
+            {!isGenericMode && 'Public datasets on AWS'}
           </div>
           <Button
             variant="outline"
@@ -110,6 +123,7 @@ const StacPanel = ({ model }: IStacViewProps) => {
           </Button>
         </div>
       </div>
+
       {/* Tabs */}
       <Tabs
         value={activeTab}
@@ -124,6 +138,7 @@ const StacPanel = ({ model }: IStacViewProps) => {
             Results ({activeTotalResults})
           </TabsTrigger>
         </TabsList>
+
         <TabsContent
           value="filters"
           className="flex-1 overflow-hidden flex flex-col h-full px-2"
@@ -147,6 +162,7 @@ const StacPanel = ({ model }: IStacViewProps) => {
             />
           )}
         </TabsContent>
+
         <TabsContent
           value="results"
           className="flex-1 overflow-y-auto h-full px-2"
@@ -175,20 +191,25 @@ const StacPanel = ({ model }: IStacViewProps) => {
     </div>
   );
 };
+
 export default StacPanel;
+
 // --- URL Input Widget for Dialog ---
 class URLInputWidget extends Widget {
   private input: HTMLInputElement;
+
   constructor(catalogs: any[] = []) {
     const node = document.createElement('div');
     node.style.padding = '20px';
     node.style.minWidth = '400px';
+
     const header = document.createElement('div');
     header.textContent = 'Connect to a STAC Catalog';
     header.style.fontSize = '14px';
     header.style.fontWeight = '600';
     header.style.marginBottom = '16px';
     header.style.color = '#111827';
+
     const label = document.createElement('label');
     label.textContent = 'Catalog URL';
     label.style.display = 'block';
@@ -196,6 +217,7 @@ class URLInputWidget extends Widget {
     label.style.fontWeight = '500';
     label.style.marginBottom = '6px';
     label.style.color = '#374151';
+
     const input = document.createElement('input');
     input.type = 'url';
     input.placeholder = 'https://example.com/stac/catalog.json';
@@ -207,6 +229,7 @@ class URLInputWidget extends Widget {
     input.style.boxSizing = 'border-box';
     input.style.fontSize = '13px';
     input.style.fontFamily = 'inherit';
+
     const catalogLabel = document.createElement('label');
     catalogLabel.textContent = 'Or select from recommended catalogs';
     catalogLabel.style.display = 'block';
@@ -214,6 +237,7 @@ class URLInputWidget extends Widget {
     catalogLabel.style.fontWeight = '500';
     catalogLabel.style.marginBottom = '6px';
     catalogLabel.style.color = '#374151';
+
     const dropdown = document.createElement('select');
     dropdown.style.width = '100%';
     dropdown.style.padding = '8px 12px';
@@ -223,28 +247,34 @@ class URLInputWidget extends Widget {
     dropdown.style.boxSizing = 'border-box';
     dropdown.style.fontSize = '13px';
     dropdown.style.fontFamily = 'inherit';
+
     const defaultOption = document.createElement('option');
     defaultOption.value = '';
     defaultOption.textContent = '-- Select a catalog --';
     dropdown.appendChild(defaultOption);
+
     catalogs.forEach((catalog: any) => {
       const option = document.createElement('option');
       option.value = catalog.url;
       option.textContent = catalog.title;
       dropdown.appendChild(option);
     });
+
     dropdown.addEventListener('change', e => {
       const val = (e.target as HTMLSelectElement).value;
       if (val) input.value = val;
     });
+
     node.appendChild(header);
     node.appendChild(label);
     node.appendChild(input);
     node.appendChild(catalogLabel);
     node.appendChild(dropdown);
+
     super({ node });
     this.input = input;
   }
+
   getInput() {
     return this.input;
   }
